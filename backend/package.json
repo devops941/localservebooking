@@ -1,0 +1,31 @@
+{
+  "name": "local-service-booking-backend",
+  "version": "1.0.0",
+  "description": "REST API Backend for Local Service Booking (Customer, Provider, Admin)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.4.1",
+    "morgan": "^1.10.0",
+    "nodemailer": "^10.2.1",
+    "socket.io": "^4.8.4"
+  },
+  "keywords": [
+    "express",
+    "mongodb",
+    "mongoose",
+    "service-booking",
+    "rest-api"
+  ],
+  "author": "",
+  "license": "ISC"
+}
