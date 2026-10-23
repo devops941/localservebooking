@@ -7,7 +7,8 @@ const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 
 dotenv.config(); // Reload env
-connectDB();
+// Non-blocking initial connection attempt for local environment
+connectDB().catch((err) => console.error('Initial DB connection attempt:', err.message));
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -40,6 +41,24 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use((req, _res, next) => { req.io = io; next(); });
 
+// Ensure MongoDB connection readiness for database-dependent routes
+app.use(async (req, res, next) => {
+  // Liveness check, root message, and Socket.IO handshakes do not block on database connection
+  if (req.path === '/api/health' || req.path === '/api/health/' || req.path === '/' || req.path.startsWith('/socket.io')) {
+    return next();
+  }
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error(`Database connection unavailable for ${req.method} ${req.path}:`, err.message);
+    res.status(503).json({
+      success: false,
+      message: 'Database connection unavailable. Please try again in a few moments.',
+    });
+  }
+});
+
 // Route imports
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -69,11 +88,21 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/map', mapRoutes);
 
 app.get('/api/health', (req, res) => {
+  const mongoose = require('mongoose');
+  const dbState = mongoose.connection.readyState;
+  const dbStatusMap = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting',
+  };
+
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     service: 'Local Service Booking Backend API',
+    database: dbStatusMap[dbState] || 'unknown',
   });
 });
 
