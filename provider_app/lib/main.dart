@@ -12,7 +12,7 @@ import 'screens/requests/requests_screen.dart';
 import 'screens/jobs/jobs_screen.dart';
 import 'screens/earnings/earnings_screen.dart';
 import 'screens/profile/profile_screen.dart';
-import 'screens/services/services_screen.dart';
+import 'screens/reviews/reviews_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,7 +47,8 @@ class ProviderApp extends StatelessWidget {
         '/jobs': (context) => const JobsScreen(),
         '/earnings': (context) => const EarningsScreen(),
         '/profile': (context) => const ProfileScreen(),
-        '/services': (context) => const ServicesScreen(),
+        '/reviews': (context) => const ReviewsScreen(),
+        '/services': (context) => const ReviewsScreen(),
       },
     );
   }

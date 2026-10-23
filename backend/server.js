@@ -6,7 +6,7 @@ const dotenv = require('dotenv');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 
-dotenv.config();
+dotenv.config(); // Reload env
 connectDB();
 
 const app = express();

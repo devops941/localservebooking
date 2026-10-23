@@ -310,32 +310,6 @@ class _AdminShellState extends State<AdminShell> {
                             color: Color(0xFF1F2937),
                           ),
                         ),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.green.shade200),
-                              ),
-                              child: const Row(
-                                children: [
-                                  CircleAvatar(radius: 4, backgroundColor: Colors.green),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    'Backend: Online',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
                     ),
                   ),

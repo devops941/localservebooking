@@ -204,6 +204,12 @@ class ProviderService extends ChangeNotifier {
     return _bookings.where((b) => b.status == BookingStatus.completed).toList();
   }
 
+  List<BookingModel> getReviewedBookings() {
+    return _bookings
+        .where((b) => b.rating != null && b.rating! > 0)
+        .toList();
+  }
+
   Future<Map<String, dynamic>> updateUpiId(String upiId) async {
     try {
       await _api.put('/providers/me', data: {'upiId': upiId.trim()});

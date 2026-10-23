@@ -38,12 +38,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   List<Map<String, dynamic>> _getDailyData(List<BookingModel> bookings) {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final result = <Map<String, dynamic>>[];
-    for (int i = 29; i >= 0; i -= 3) {
-      final date = now.subtract(Duration(days: i));
-      final dayBkgs = bookings.where((b) => date.difference(b.bookingDate).inDays.abs() <= 1).toList();
-      final gross = dayBkgs.fold<double>(0, (s, b) => s + b.totalAmount);
-      result.add({'label': '${date.day} ${_monthAbbr(date.month)}', 'gross': gross, 'commission': gross * 0.15});
+    const int count = 7;
+    const int stepDays = 4;
+    for (int idx = count - 1; idx >= 0; idx--) {
+      final targetDate = today.subtract(Duration(days: idx * stepDays));
+      final nextDate = targetDate.add(const Duration(days: stepDays));
+
+      final matched = bookings.where((b) {
+        final bDate = DateTime(b.bookingDate.year, b.bookingDate.month, b.bookingDate.day);
+        return !bDate.isBefore(targetDate) && bDate.isBefore(nextDate);
+      }).toList();
+
+      final gross = matched.fold<double>(0, (s, b) => s + b.totalAmount);
+      result.add({
+        'label': '${targetDate.day} ${_monthAbbr(targetDate.month)}',
+        'gross': gross,
+        'commission': gross * 0.15,
+      });
     }
     return result;
   }
@@ -53,9 +66,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final result = <Map<String, dynamic>>[];
     for (int i = 5; i >= 0; i--) {
       final month = DateTime(now.year, now.month - i, 1);
-      final mb = bookings.where((b) => b.bookingDate.year == month.year && b.bookingDate.month == month.month).toList();
+      final nextMonth = DateTime(now.year, now.month - i + 1, 1);
+      final mb = bookings.where((b) =>
+          !b.bookingDate.isBefore(month) && b.bookingDate.isBefore(nextMonth)).toList();
       final gross = mb.fold<double>(0, (s, b) => s + b.totalAmount);
-      result.add({'label': _monthAbbr(month.month), 'gross': gross, 'commission': gross * 0.15});
+      result.add({
+        'label': _monthAbbr(month.month),
+        'gross': gross,
+        'commission': gross * 0.15,
+      });
     }
     return result;
   }
@@ -157,20 +176,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ),
         const SizedBox(width: 12),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFECFDF5),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF6EE7B7)),
-          ),
-          child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(radius: 4, backgroundColor: Color(0xFF10B981)),
-            SizedBox(width: 6),
-            Text('Backend Online', style: TextStyle(fontSize: 12, color: Color(0xFF065F46), fontWeight: FontWeight.w600)),
-          ]),
-        ),
-        const SizedBox(width: 10),
-        Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -246,75 +251,200 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildRevenueLineChart(List<Map<String, dynamic>> dailyData) {
-    final maxGross = dailyData.isEmpty ? 0.0
-        : dailyData.map((d) => (d['gross'] as double)).reduce(math.max);
-    final useReal = maxGross > 0;
-    final sampleG = [850.0,900.0,820.0,1050.0,1300.0,1080.0,1400.0,1200.0,1600.0,1450.0];
-    final maxVal = useReal ? maxGross : sampleG.reduce(math.max);
-    final labelSet = <int>{0, dailyData.length ~/ 2, dailyData.length - 1};
+    final hasRealBookings = dailyData.any((d) => ((d['gross'] as num?)?.toDouble() ?? 0) > 0);
+    final sampleDaily = [950.0, 1100.0, 1020.0, 1450.0, 1800.0, 1650.0, 2400.0];
 
-    final grossSpots = List<FlSpot>.generate(dailyData.length, (i) =>
-        FlSpot(i.toDouble(), useReal ? (dailyData[i]['gross'] as double) : sampleG[i % sampleG.length]));
-    final commSpots = List<FlSpot>.generate(dailyData.length, (i) =>
-        FlSpot(i.toDouble(), useReal ? (dailyData[i]['commission'] as double) : sampleG[i % sampleG.length] * 0.15));
+    final grossSpots = List<FlSpot>.generate(dailyData.length, (i) {
+      final val = hasRealBookings
+          ? ((dailyData[i]['gross'] as num?)?.toDouble() ?? 0.0)
+          : sampleDaily[i % sampleDaily.length];
+      return FlSpot(i.toDouble(), val);
+    });
+
+    final commSpots = List<FlSpot>.generate(dailyData.length, (i) {
+      final val = hasRealBookings
+          ? ((dailyData[i]['commission'] as num?)?.toDouble() ?? 0.0)
+          : (sampleDaily[i % sampleDaily.length] * 0.15);
+      return FlSpot(i.toDouble(), val);
+    });
+
+    final maxGross = grossSpots.map((s) => s.y).fold<double>(0.0, math.max);
+    final maxComm = commSpots.map((s) => s.y).fold<double>(0.0, math.max);
+    final peak = math.max(maxGross, maxComm);
+    final double maxY = peak <= 1000
+        ? 1500.0
+        : ((peak * 1.25 / 500).ceil() * 500.0);
+    final double yInterval = (maxY / 4).clamp(200.0, 50000.0);
 
     return _SectionCard(
       title: 'Revenue Overview',
       subtitle: 'Gross booking volume vs Platform commission (Last 30 days)',
       legendItems: const [
-        _LegendItem(color: Color(0xFF1E88E5), label: 'Gross Booking Volume'),
+        _LegendItem(color: Color(0xFF2563EB), label: 'Gross Booking Volume'),
         _LegendItem(color: Color(0xFF10B981), label: 'Platform Commission'),
       ],
       child: SizedBox(
-        height: 220,
-        child: LineChart(LineChartData(
-          gridData: FlGridData(
-            show: true, drawVerticalLine: false,
-            horizontalInterval: maxVal / 4,
-            getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFFE5E7EB), strokeWidth: 1),
-          ),
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(sideTitles: SideTitles(
-              showTitles: true, reservedSize: 52, interval: maxVal / 4,
-              getTitlesWidget: (val, _) {
-                if (val == 0) return const SizedBox.shrink();
-                return Text(
-                  val >= 1000 ? '₹${(val/1000).toStringAsFixed(0)}K' : '₹${val.toInt()}',
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
-                );
-              },
-            )),
-            bottomTitles: AxisTitles(sideTitles: SideTitles(
-              showTitles: true, reservedSize: 28,
-              getTitlesWidget: (val, _) {
-                final idx = val.toInt();
-                if (!labelSet.contains(idx) || idx >= dailyData.length) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(dailyData[idx]['label'] as String, style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF))),
-                );
-              },
-            )),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          borderData: FlBorderData(show: false),
-          minX: 0, maxX: (dailyData.length - 1).toDouble(), minY: 0, maxY: maxVal * 1.15,
-          lineBarsData: [
-            LineChartBarData(
-              spots: grossSpots, isCurved: true,
-              color: const Color(0xFF1E88E5), barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(show: true, color: const Color(0xFF1E88E5).withValues(alpha: 0.07)),
+        height: 230,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LineChart(
+            LineChartData(
+              clipData: const FlClipData.all(),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: yInterval,
+                getDrawingHorizontalLine: (_) => const FlLine(
+                  color: Color(0xFFF1F5F9),
+                  strokeWidth: 1,
+                  dashArray: [4, 4],
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 52,
+                    interval: yInterval,
+                    getTitlesWidget: (val, _) {
+                      if (val < 0) return const SizedBox.shrink();
+                      String txt;
+                      if (val >= 1000000) {
+                        txt = '₹${(val / 1000000).toStringAsFixed(1)}M';
+                      } else if (val >= 1000) {
+                        txt = '₹${(val / 1000).toStringAsFixed(0)}K';
+                      } else {
+                        txt = '₹${val.toInt()}';
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          txt,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: 1,
+                    getTitlesWidget: (val, _) {
+                      final idx = val.round();
+                      if ((val - idx).abs() > 0.05) return const SizedBox.shrink();
+                      if (idx < 0 || idx >= dailyData.length) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          dailyData[idx]['label'] as String,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              minX: 0,
+              maxX: (dailyData.length - 1).toDouble(),
+              minY: 0,
+              maxY: maxY,
+              lineTouchData: LineTouchData(
+                enabled: true,
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) => const Color(0xFF1E293B),
+                  tooltipRoundedRadius: 8,
+                  getTooltipItems: (touchedSpots) {
+                    return touchedSpots.map((spot) {
+                      final isGross = spot.barIndex == 0;
+                      return LineTooltipItem(
+                        '${isGross ? "Gross" : "Comm"}: ₹${spot.y.toStringAsFixed(0)}',
+                        TextStyle(
+                          color: isGross ? const Color(0xFF93C5FD) : const Color(0xFF6EE7B7),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: grossSpots,
+                  isCurved: true,
+                  curveSmoothness: 0.22,
+                  preventCurveOverShooting: true,
+                  color: const Color(0xFF2563EB),
+                  barWidth: 2.5,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                      radius: 3,
+                      color: Colors.white,
+                      strokeWidth: 2,
+                      strokeColor: const Color(0xFF2563EB),
+                    ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF2563EB).withValues(alpha: 0.15),
+                        const Color(0xFF2563EB).withValues(alpha: 0.01),
+                      ],
+                    ),
+                  ),
+                ),
+                LineChartBarData(
+                  spots: commSpots,
+                  isCurved: true,
+                  curveSmoothness: 0.22,
+                  preventCurveOverShooting: true,
+                  color: const Color(0xFF10B981),
+                  barWidth: 2.5,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                      radius: 3,
+                      color: Colors.white,
+                      strokeWidth: 2,
+                      strokeColor: const Color(0xFF10B981),
+                    ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF10B981).withValues(alpha: 0.12),
+                        const Color(0xFF10B981).withValues(alpha: 0.01),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            LineChartBarData(
-              spots: commSpots, isCurved: true,
-              color: const Color(0xFF10B981), barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(show: true, color: const Color(0xFF10B981).withValues(alpha: 0.07)),
-            ),
-          ],
-        )),
+          ),
+        ),
       ),
     );
   }
@@ -386,79 +516,200 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildMonthlyLineChart(List<Map<String, dynamic>> monthlyData) {
-    final sampleGross = [7500.0, 10000.0, 12000.0, 15000.0, 17000.0, 25000.0];
-    final maxGross = monthlyData.isEmpty ? 0.0
-        : monthlyData.map((d) => (d['gross'] as double)).reduce(math.max);
-    final useReal = maxGross > 0;
-    final maxVal = useReal ? maxGross : sampleGross.reduce(math.max);
+    final hasRealBookings = monthlyData.any((d) => ((d['gross'] as num?)?.toDouble() ?? 0) > 0);
+    final sampleMonthly = [2500.0, 3200.0, 4100.0, 4800.0, 5600.0, 7200.0];
 
     final grossSpots = List<FlSpot>.generate(monthlyData.length, (i) {
-      final g = (monthlyData[i]['gross'] as double);
-      return FlSpot(i.toDouble(), useReal && g > 0 ? g : sampleGross[i % sampleGross.length]);
+      final val = hasRealBookings
+          ? ((monthlyData[i]['gross'] as num?)?.toDouble() ?? 0.0)
+          : sampleMonthly[i % sampleMonthly.length];
+      return FlSpot(i.toDouble(), val);
     });
+
     final commSpots = List<FlSpot>.generate(monthlyData.length, (i) {
-      final c = (monthlyData[i]['commission'] as double);
-      final fallback = sampleGross[i % sampleGross.length] * 0.15;
-      return FlSpot(i.toDouble(), useReal && c > 0 ? c : fallback);
+      final val = hasRealBookings
+          ? ((monthlyData[i]['commission'] as num?)?.toDouble() ?? 0.0)
+          : (sampleMonthly[i % sampleMonthly.length] * 0.15);
+      return FlSpot(i.toDouble(), val);
     });
+
+    final maxGross = grossSpots.map((s) => s.y).fold<double>(0.0, math.max);
+    final maxComm = commSpots.map((s) => s.y).fold<double>(0.0, math.max);
+    final peak = math.max(maxGross, maxComm);
+    final double maxY = peak <= 1000
+        ? 1500.0
+        : ((peak * 1.25 / 500).ceil() * 500.0);
+    final double yInterval = (maxY / 4).clamp(200.0, 50000.0);
 
     return _SectionCard(
       title: 'Monthly Revenue',
-      subtitle: 'Gross booking volume (₹)',
+      subtitle: 'Gross booking volume (₹) vs Commission',
       legendItems: const [
-        _LegendItem(color: Color(0xFF1E88E5), label: 'Gross Booking Volume'),
+        _LegendItem(color: Color(0xFF2563EB), label: 'Gross Booking Volume'),
         _LegendItem(color: Color(0xFF10B981), label: 'Commission'),
       ],
       child: SizedBox(
-        height: 220,
-        child: LineChart(LineChartData(
-          gridData: FlGridData(
-            show: true, drawVerticalLine: false,
-            horizontalInterval: maxVal / 4,
-            getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFFE5E7EB), strokeWidth: 1),
-          ),
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(sideTitles: SideTitles(
-              showTitles: true, reservedSize: 52, interval: maxVal / 4,
-              getTitlesWidget: (val, _) {
-                if (val == 0) return const SizedBox.shrink();
-                return Text(
-                  val >= 1000 ? '₹${(val/1000).toStringAsFixed(0)}K' : '₹${val.toInt()}',
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
-                );
-              },
-            )),
-            bottomTitles: AxisTitles(sideTitles: SideTitles(
-              showTitles: true, reservedSize: 28,
-              getTitlesWidget: (val, _) {
-                final idx = val.toInt();
-                if (idx >= monthlyData.length) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(monthlyData[idx]['label'] as String, style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-                );
-              },
-            )),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          borderData: FlBorderData(show: false),
-          minX: 0, maxX: (monthlyData.length - 1).toDouble(), minY: 0, maxY: maxVal * 1.25,
-          lineBarsData: [
-            LineChartBarData(
-              spots: grossSpots, isCurved: true,
-              color: const Color(0xFF1E88E5), barWidth: 2.5,
-              dotData: const FlDotData(show: true),
-              belowBarData: BarAreaData(show: true, color: const Color(0xFF1E88E5).withValues(alpha: 0.09)),
+        height: 230,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LineChart(
+            LineChartData(
+              clipData: const FlClipData.all(),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: yInterval,
+                getDrawingHorizontalLine: (_) => const FlLine(
+                  color: Color(0xFFF1F5F9),
+                  strokeWidth: 1,
+                  dashArray: [4, 4],
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 52,
+                    interval: yInterval,
+                    getTitlesWidget: (val, _) {
+                      if (val < 0) return const SizedBox.shrink();
+                      String txt;
+                      if (val >= 1000000) {
+                        txt = '₹${(val / 1000000).toStringAsFixed(1)}M';
+                      } else if (val >= 1000) {
+                        txt = '₹${(val / 1000).toStringAsFixed(0)}K';
+                      } else {
+                        txt = '₹${val.toInt()}';
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          txt,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: 1,
+                    getTitlesWidget: (val, _) {
+                      final idx = val.round();
+                      if ((val - idx).abs() > 0.05) return const SizedBox.shrink();
+                      if (idx < 0 || idx >= monthlyData.length) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          monthlyData[idx]['label'] as String,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              minX: 0,
+              maxX: (monthlyData.length - 1).toDouble(),
+              minY: 0,
+              maxY: maxY,
+              lineTouchData: LineTouchData(
+                enabled: true,
+                touchTooltipData: LineTouchTooltipData(
+                  getTooltipColor: (_) => const Color(0xFF1E293B),
+                  tooltipRoundedRadius: 8,
+                  getTooltipItems: (touchedSpots) {
+                    return touchedSpots.map((spot) {
+                      final isGross = spot.barIndex == 0;
+                      return LineTooltipItem(
+                        '${isGross ? "Gross" : "Comm"}: ₹${spot.y.toStringAsFixed(0)}',
+                        TextStyle(
+                          color: isGross ? const Color(0xFF93C5FD) : const Color(0xFF6EE7B7),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+              ),
+              lineBarsData: [
+                LineChartBarData(
+                  spots: grossSpots,
+                  isCurved: true,
+                  curveSmoothness: 0.22,
+                  preventCurveOverShooting: true,
+                  color: const Color(0xFF2563EB),
+                  barWidth: 2.5,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                      radius: 3.5,
+                      color: Colors.white,
+                      strokeWidth: 2,
+                      strokeColor: const Color(0xFF2563EB),
+                    ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF2563EB).withValues(alpha: 0.15),
+                        const Color(0xFF2563EB).withValues(alpha: 0.01),
+                      ],
+                    ),
+                  ),
+                ),
+                LineChartBarData(
+                  spots: commSpots,
+                  isCurved: true,
+                  curveSmoothness: 0.22,
+                  preventCurveOverShooting: true,
+                  color: const Color(0xFF10B981),
+                  barWidth: 2.5,
+                  isStrokeCapRound: true,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                      radius: 3.5,
+                      color: Colors.white,
+                      strokeWidth: 2,
+                      strokeColor: const Color(0xFF10B981),
+                    ),
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF10B981).withValues(alpha: 0.12),
+                        const Color(0xFF10B981).withValues(alpha: 0.01),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            LineChartBarData(
-              spots: commSpots, isCurved: true,
-              color: const Color(0xFF10B981), barWidth: 2.5,
-              dotData: const FlDotData(show: true),
-              belowBarData: BarAreaData(show: true, color: const Color(0xFF10B981).withValues(alpha: 0.09)),
-            ),
-          ],
-        )),
+          ),
+        ),
       ),
     );
   }
@@ -474,16 +725,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+            border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+          ),
           child: const Row(children: [
-            Expanded(flex: 2, child: Text('Booking ID', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
-            Expanded(flex: 2, child: Text('Service Category', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
-            Expanded(flex: 2, child: Text('Booking Date', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
-            Expanded(flex: 2, child: Text('Booking Amount', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
-            Expanded(flex: 2, child: Text('Commission', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
-            Expanded(flex: 2, child: Text('Provider Payout', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
-            Expanded(flex: 2, child: Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6B7280)))),
+            Expanded(flex: 2, child: Text('Booking ID', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            SizedBox(width: 8),
+            Expanded(flex: 3, child: Text('Service Category', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            SizedBox(width: 8),
+            Expanded(flex: 2, child: Text('Booking Date', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            SizedBox(width: 8),
+            Expanded(flex: 2, child: Text('Amount', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            SizedBox(width: 8),
+            Expanded(flex: 2, child: Text('Commission', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            SizedBox(width: 8),
+            Expanded(flex: 2, child: Text('Payout', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            SizedBox(width: 8),
+            Expanded(flex: 2, child: Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
           ]),
         ),
         if (bookings.isEmpty)
@@ -516,22 +777,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             }
 
             return Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6)))),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9)))),
               child: Row(children: [
-                Expanded(flex: 2, child: Text(bId, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1F2937)))),
-                Expanded(flex: 2, child: Text(
+                Expanded(flex: 2, child: Text(bId, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)))),
+                const SizedBox(width: 8),
+                Expanded(flex: 3, child: Text(
                   b.serviceTitle.length > 18 ? '${b.serviceTitle.substring(0, 16)}…' : b.serviceTitle,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF374151)),
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
                 )),
-                Expanded(flex: 2, child: Text(dateStr, style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)))),
-                Expanded(flex: 2, child: Text('₹${b.totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
-                Expanded(flex: 2, child: Text('₹${comm.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w500))),
-                Expanded(flex: 2, child: Text('₹${payout.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, color: Color(0xFF1E88E5), fontWeight: FontWeight.w500))),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: Text(dateStr, style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)))),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: Text('₹${b.totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)))),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: Text('₹${comm.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w600))),
+                const SizedBox(width: 8),
+                Expanded(flex: 2, child: Text('₹${payout.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600))),
+                const SizedBox(width: 8),
                 Expanded(flex: 2, child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: sBg, borderRadius: BorderRadius.circular(6)),
-                  child: Text(sLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: sColor)),
+                  child: Text(sLabel, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: sColor)),
                 )),
               ]),
             );

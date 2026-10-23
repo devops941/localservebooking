@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
+const dotenv = require('dotenv');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const ProviderProfile = require('../models/ProviderProfile');
@@ -114,6 +115,14 @@ const updateProfile = async (req, res) => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function isEmailConfigured() {
+  dotenv.config();
+  // Generic SMTP (SMTP_HOST, SMTP_USER, SMTP_PASS)
+  const smtpHost = (process.env.SMTP_HOST || '').trim();
+  const smtpUser = (process.env.SMTP_USER || '').trim();
+  const smtpPass = (process.env.SMTP_PASS || '').trim();
+  if (smtpHost && smtpUser && smtpPass && !smtpPass.includes('xxxx')) {
+    return true;
+  }
   // Brevo SMTP
   const brevoUser = (process.env.BREVO_SMTP_USER || '').trim();
   const brevoKey  = (process.env.BREVO_SMTP_KEY  || '').trim();
@@ -132,6 +141,22 @@ function isEmailConfigured() {
 }
 
 function createTransporter() {
+  const smtpHost = (process.env.SMTP_HOST || '').trim();
+  const smtpUser = (process.env.SMTP_USER || '').trim();
+  const smtpPass = (process.env.SMTP_PASS || '').trim();
+
+  if (smtpHost && smtpUser && smtpPass && !smtpPass.includes('xxxx')) {
+    const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
+    const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+    return nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: { user: smtpUser, pass: smtpPass },
+      tls: { rejectUnauthorized: false },
+    });
+  }
+
   const brevoUser = (process.env.BREVO_SMTP_USER || '').trim();
   const brevoKey  = (process.env.BREVO_SMTP_KEY  || '').trim();
 
@@ -157,11 +182,11 @@ function createTransporter() {
 }
 
 function getSenderAddress() {
-  const brevoUser = (process.env.BREVO_SMTP_USER || '').trim();
-  if (brevoUser.includes('@') && !(process.env.BREVO_SMTP_KEY || '').includes('xxxx')) {
-    return brevoUser;
+  if (process.env.SMTP_FROM && process.env.SMTP_FROM.trim()) {
+    return process.env.SMTP_FROM.trim();
   }
-  return process.env.GMAIL_USER;
+  const emailAddr = (process.env.SMTP_USER || process.env.GMAIL_USER || process.env.BREVO_SMTP_USER || '').trim();
+  return `"LocalServe" <${emailAddr}>`;
 }
 
 // ─── Step 1: Send OTP ─────────────────────────────────────────────────────────
@@ -216,7 +241,7 @@ const sendOtp = async (req, res) => {
 
     try {
       await transporter.sendMail({
-        from: `"LocalServe" <${getSenderAddress()}>`,
+        from: getSenderAddress(),
         to: email,
         subject: 'Your OTP for Password Reset – LocalServe',
         html: `

@@ -6,7 +6,7 @@ import '../requests/requests_screen.dart';
 import '../jobs/jobs_screen.dart';
 import '../earnings/earnings_screen.dart';
 import '../profile/profile_screen.dart';
-import '../services/services_screen.dart';
+import '../reviews/reviews_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -388,6 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 .toDouble();
         final rating =
             (stats['rating'] ?? providerProfile?.rating ?? 0).toDouble();
+        final reviewCount = providerProfile?.reviewCount ?? 0;
         final completedJobs =
             stats['totalCompletedJobs'] ?? providerProfile?.completedJobs ?? 0;
         final unreadNotifs = providerService.unreadNotifications;
@@ -682,24 +683,29 @@ class _HomeScreenState extends State<HomeScreen> {
                                     color: Color(0xFF1F2937)),
                               ),
                               const SizedBox(height: 12),
-                              GridView.count(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                                childAspectRatio: 1.55,
+                              GridView(
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  mainAxisExtent: 136,
+                                ),
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 children: [
                                   _buildActionCard(
-                                    'My Rate Card',
-                                    'Edit prices',
-                                    Icons.sell_outlined,
-                                    const Color(0xFF7C3AED),
+                                    'Customer Reviews',
+                                    rating > 0
+                                        ? '${rating.toStringAsFixed(1)} ★ ($reviewCount review${reviewCount > 1 ? 's' : ''})'
+                                        : 'View feedback',
+                                    Icons.reviews_rounded,
+                                    const Color(0xFFF59E0B),
                                     () => Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                          builder: (_) =>
-                                              const ServicesScreen()),
+                                        builder: (_) => const ReviewsScreen(),
+                                      ),
                                     ),
                                   ),
                                   _buildActionCard(
@@ -743,16 +749,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSummaryItem(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 20),
-        const SizedBox(height: 6),
-        Text(value,
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white, size: 20),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 11)),
-      ],
+                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+        ],
+      ),
     );
   }
 
@@ -762,48 +778,66 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildActionCard(String title, String subtitle, IconData icon,
       Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+      elevation: 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(height: 10),
-            Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: Color(0xFF1F2937))),
-            const SizedBox(height: 2),
-            Text(subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-          ],
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
