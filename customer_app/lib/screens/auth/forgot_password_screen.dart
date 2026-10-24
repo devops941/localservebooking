@@ -492,7 +492,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 16, 20),
+                padding: const EdgeInsets.fromLTRB(8, 2, 16, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -500,7 +500,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       onPressed: () => Navigator.pop(context),
                       icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
                     ),
-                    const SizedBox(height: 4),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Column(
@@ -509,12 +508,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           const Text(
                             'Account Recovery',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           _stepIndicator(),
                         ],
                       ),

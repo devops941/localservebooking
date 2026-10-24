@@ -7,7 +7,8 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  static const String baseUrl = 'http://localhost:5000/api';
+  // static const String baseUrl = 'http://localhost:5000/api';
+  static const String baseUrl = 'https://localservebooking.vercel.app/api';
   String? _authToken;
 
   void setAuthToken(String? token) {

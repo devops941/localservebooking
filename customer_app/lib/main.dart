@@ -19,6 +19,7 @@ import 'screens/bookings/booking_screen.dart';
 import 'screens/bookings/my_bookings_screen.dart';
 import 'screens/bookings/booking_details_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/profile/edit_profile_screen.dart';
 import 'screens/areas/area_selection_screen.dart';
 import 'screens/map/booking_map_screen.dart';
 
@@ -119,6 +120,11 @@ class CustomerApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => const ProfileScreen(),
+            );
+          case '/edit_profile':
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const EditProfileScreen(),
             );
           case '/areas':
             return MaterialPageRoute(

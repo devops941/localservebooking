@@ -60,10 +60,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
               ),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           labelColor: const Color(0xFF1E88E5),
           unselectedLabelColor: Colors.grey.shade600,
           indicatorColor: const Color(0xFF1E88E5),
           indicatorWeight: 3,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 20),
           labelStyle:
               const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: [

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/auth_service.dart';
-import '../../core/widgets/custom_button.dart';
-import '../../core/widgets/custom_textfield.dart';
 
 class ProfileScreen extends StatefulWidget {
   final bool isTab;
@@ -15,117 +13,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // ── Edit Profile ────────────────────────────────────────────────────────────
-
-  void _openEditProfileSheet() {
-    final authService = context.read<AuthService>();
-    final user = authService.currentUser;
-    final nameCtrl = TextEditingController(text: user?.name ?? '');
-    final phoneCtrl = TextEditingController(text: user?.phone ?? '');
-    String? selectedGender = user?.gender;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Edit Profile',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            CustomTextField(
-              controller: nameCtrl,
-              labelText: 'Full Name',
-              hintText: 'Enter your name',
-              prefixIcon: Icons.person_outline,
-            ),
-            const SizedBox(height: 14),
-            CustomTextField(
-              controller: phoneCtrl,
-              labelText: 'Phone Number',
-              hintText: 'Enter phone number',
-              prefixIcon: Icons.phone_outlined,
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 14),
-            const Text('Gender', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF374151))),
-            const SizedBox(height: 8),
-            StatefulBuilder(
-              builder: (ctx2, setGender) {
-                return Wrap(
-                  spacing: 8,
-                  runSpacing: 0,
-                  children: ['male', 'female', 'other'].map((g) {
-                    final label = g == 'male' ? 'Male' : g == 'female' ? 'Female' : 'Other';
-                    final icon = g == 'male' ? Icons.man_rounded : g == 'female' ? Icons.woman_rounded : Icons.person_rounded;
-                    final isSelected = selectedGender == g;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setGender(() => selectedGender = g),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF1E88E5) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected ? const Color(0xFF1E88E5) : Colors.grey.shade300,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(icon, size: 22, color: isSelected ? Colors.white : Colors.grey.shade600),
-                              const SizedBox(height: 2),
-                              Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : Colors.grey.shade600)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            CustomButton(
-              text: 'Save Changes',
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await authService.updateProfile(
-                  name: nameCtrl.text.trim(),
-                  phone: phoneCtrl.text.trim(),
-                  gender: selectedGender,
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── Logout ──────────────────────────────────────────────────────────────────
 
   void _handleLogout() {
@@ -201,8 +88,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildPaymentOption(
                 Icons.account_balance_wallet_outlined, Colors.indigo,
                 'UPI (GPay / PhonePe)',
-                'Digital UPI payment — coming soon.',
-                isActive: false),
+                'Scan provider\'s QR code via any UPI app.',
+                isActive: true),
             const Divider(height: 24),
             _buildPaymentOption(Icons.credit_card_outlined, Colors.purple,
                 'Credit / Debit Cards', 'Card payment — coming soon.',
@@ -221,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'All payments are currently made in cash directly to the provider after job completion.',
+                      'Pay via Cash or scan the provider\'s UPI QR code using GPay / PhonePe after job completion.',
                       style: TextStyle(
                           fontSize: 12, color: Color(0xFF1565C0)),
                     ),
@@ -655,7 +542,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           IconButton(
             icon: const Icon(Icons.edit_outlined,
                 color: Colors.white, size: 20),
-            onPressed: _openEditProfileSheet,
+            onPressed: () => Navigator.pushNamed(context, '/edit_profile'),
             tooltip: 'Edit Profile',
           ),
         ],
@@ -665,18 +552,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // ── Hero Header ────────────────────────────────────────────────────
           Container(
             color: const Color(0xFF1E88E5),
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
             child: Row(
               children: [
                 Stack(
                   children: [
                     CircleAvatar(
-                      radius: 36,
+                      radius: 28,
                       backgroundColor:
                           Colors.white.withValues(alpha: 0.25),
                       child: Icon(
                         user?.gender == 'female' ? Icons.face_retouching_natural : Icons.face,
-                        size: 40,
+                        size: 30,
                         color: Colors.white,
                       ),
                     ),
@@ -703,34 +590,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Text(
                         user?.name ?? 'Customer',
                         style: const TextStyle(
-                          fontSize: 19,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (user?.email.isNotEmpty == true) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1),
                         Text(
                           user!.email,
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 11.5,
                             color: Colors.white.withValues(alpha: 0.82),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                       if (user?.phone.isNotEmpty == true) ...[
-                        const SizedBox(height: 1),
                         Text(
                           user!.phone,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Colors.white.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 3),

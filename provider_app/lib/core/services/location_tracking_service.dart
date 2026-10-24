@@ -10,7 +10,8 @@ class LocationTrackingService {
   bool get isTracking => _positionSub != null;
 
   // Derive socket URL from API base (strip /api suffix)
-  static const String _socketUrl = 'http://192.168.1.6:5000';
+  // static const String _socketUrl = 'http://192.168.1.6:5000';
+  static const String _socketUrl = 'https://localservebooking.vercel.app';
 
   Future<void> startTracking(String bookingId) async {
     if (isTracking) await stopTracking();

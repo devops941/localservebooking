@@ -1,5 +1,6 @@
 class ApiConstants {
-  static const String baseUrl = 'http://192.168.1.6:5000/api';
+  // static const String baseUrl = 'http://192.168.1.6:5000/api';
+  static const String baseUrl = 'https://localservebooking.vercel.app/api';
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String me = '/auth/me';
