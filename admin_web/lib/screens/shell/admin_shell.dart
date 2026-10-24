@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/admin_service.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../users/users_screen.dart';
 import '../verifications/verifications_screen.dart';
@@ -33,6 +34,9 @@ class _AdminShellState extends State<AdminShell> {
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AdminService>().loadNotifications();
+    });
   }
 
   Widget _buildScreen(int index) {
@@ -310,6 +314,7 @@ class _AdminShellState extends State<AdminShell> {
                             color: Color(0xFF1F2937),
                           ),
                         ),
+                        _NotificationBell(),
                       ],
                     ),
                   ),
@@ -328,4 +333,118 @@ class _SidebarItem {
   final IconData icon;
   final String label;
   const _SidebarItem({required this.icon, required this.label});
+}
+
+class _NotificationBell extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final svc = context.watch<AdminService>();
+    final count = svc.unreadNotificationCount;
+
+    return PopupMenuButton<int>(
+      offset: const Offset(0, 48),
+      constraints: const BoxConstraints(minWidth: 320, maxWidth: 360),
+      tooltip: 'Notifications',
+      onOpened: () => svc.loadNotifications(),
+      itemBuilder: (ctx) {
+        final items = svc.notifications;
+        if (items.isEmpty) {
+          return [
+            const PopupMenuItem(
+              enabled: false,
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: Text('No notifications', style: TextStyle(color: Colors.grey)),
+                ),
+              ),
+            ),
+          ];
+        }
+        final tiles = items.take(10).map((n) {
+          final isRead = n['read'] == true;
+          return PopupMenuItem<int>(
+            enabled: false,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isRead ? Colors.transparent : const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ListTile(
+                dense: true,
+                leading: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFF1E88E5).withValues(alpha: 0.15),
+                  child: const Icon(Icons.person_add_outlined, size: 18, color: Color(0xFF1E88E5)),
+                ),
+                title: Text(
+                  n['title']?.toString() ?? '',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  n['message']?.toString() ?? '',
+                  style: const TextStyle(fontSize: 11),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          );
+        }).toList();
+
+        return [
+          PopupMenuItem(
+            enabled: false,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Notifications', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                if (count > 0)
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      svc.markAllNotificationsRead();
+                    },
+                    child: const Text('Mark all read', style: TextStyle(fontSize: 12)),
+                  ),
+              ],
+            ),
+          ),
+          const PopupMenuDivider(),
+          ...tiles,
+        ];
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: Color(0xFF6B7280)),
+            onPressed: null,
+          ),
+          if (count > 0)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  color: Colors.redAccent,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                child: Text(
+                  count > 99 ? '99+' : count.toString(),
+                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

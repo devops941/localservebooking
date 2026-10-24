@@ -14,6 +14,8 @@ class AdminService extends ChangeNotifier {
   List<UserModel> _users = [];
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _monthlyRevenue = [];
+  List<Map<String, dynamic>> _notifications = [];
+  int _unreadNotificationCount = 0;
 
   bool _isLoading = false;
   String? _error;
@@ -24,6 +26,8 @@ class AdminService extends ChangeNotifier {
   List<UserModel> get users => _users;
   List<Map<String, dynamic>> get categories => _categories;
   List<Map<String, dynamic>> get monthlyRevenue => _monthlyRevenue;
+  List<Map<String, dynamic>> get notifications => _notifications;
+  int get unreadNotificationCount => _unreadNotificationCount;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -35,6 +39,28 @@ class AdminService extends ChangeNotifier {
   void _setError(String? msg) {
     _error = msg;
     notifyListeners();
+  }
+
+  /// GET /notifications
+  Future<void> loadNotifications() async {
+    try {
+      final response = await _client.dio.get('/notifications');
+      final body = response.data as Map<String, dynamic>;
+      final data = (body['data'] ?? body) as Map<String, dynamic>;
+      _notifications = List<Map<String, dynamic>>.from(data['notifications'] ?? []);
+      _unreadNotificationCount = (data['unreadCount'] as num?)?.toInt() ?? 0;
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// PATCH /notifications/read-all
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await _client.dio.patch('/notifications/read-all');
+      _unreadNotificationCount = 0;
+      _notifications = _notifications.map((n) => {...n, 'read': true}).toList();
+      notifyListeners();
+    } catch (_) {}
   }
 
   /// GET /admin/analytics/monthly

@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
 const ProviderProfile = require('../models/ProviderProfile');
+const Notification = require('../models/Notification');
 const { generateToken } = require('../utils/jwt');
 const { sendSuccess, sendError } = require('../utils/response');
 
@@ -44,6 +45,19 @@ const register = async (req, res) => {
         experienceYears: experienceYears || 1,
         isVerified: false,
       });
+
+      const adminUsers = await User.find({ role: 'admin' }).select('_id');
+      if (adminUsers.length > 0) {
+        await Notification.insertMany(
+          adminUsers.map((admin) => ({
+            user: admin._id,
+            type: 'new_provider_registration',
+            title: 'New Provider Registration',
+            message: `${name} has registered as a ${profession || 'service provider'} and is awaiting KYC verification.`,
+            providerName: name,
+          }))
+        );
+      }
     }
 
     const token = generateToken(user);

@@ -5,7 +5,7 @@ const notificationSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     type: {
       type: String,
-      enum: ['kyc_approved', 'kyc_rejected', 'booking_request', 'booking_confirmed', 'booking_cancelled', 'general', 'delay_notification'],
+      enum: ['kyc_approved', 'kyc_rejected', 'booking_request', 'booking_confirmed', 'booking_cancelled', 'general', 'delay_notification', 'new_provider_registration'],
       default: 'general',
     },
     title: { type: String, required: true },
