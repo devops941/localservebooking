@@ -21,7 +21,7 @@ const connectDB = async () => {
   if (!cached.promise) {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/local_service_booking';
     const opts = {
-      bufferCommands: false,
+      bufferCommands: true,
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 15000,
       connectTimeoutMS: 15000,
